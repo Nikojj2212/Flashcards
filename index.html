@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <title>Flashcards Studio</title>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" rel="stylesheet" />
+  <style>
+    :root {
+      --primary-color: #a8e6a1;
+      --secondary-color: #a0c4ff;
+      --warning-color: #ffb347;
+      --danger-color: #ff6961;
+      --padding: 20px;
+      --border-radius: 8px;
+      --safe-area-top: env(safe-area-inset-top);
+      --safe-area-bottom: env(safe-area-inset-bottom);
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+      -webkit-touch-callout: none;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      padding: var(--padding);
+      padding-top: calc(var(--padding) + var(--safe-area-top));
+      padding-bottom: calc(var(--padding) + var(--safe-area-bottom));
+      background: #f4f4f4;
+      max-width: 600px;
+      margin: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    h1, h2 { text-align: center; }
+
+    /* Common input styles */
+    input, textarea, select, button {
+      font: inherit;
+      padding: 12px;
+      margin-top: 5px;
+      width: 100%;
+      border-radius: var(--border-radius);
+      border: 1px solid #ddd;
+      appearance: none;
+    }
+
+    /* Common button styles */
+    button {
+      cursor: pointer;
+      touch-action: manipulation;
+      user-select: none;
+      border: none;
+    }
+
+    button:active { opacity: 0.7; }
+
+    /* Card styles */
+    .flashcard {
+      background: white;
+      padding: var(--padding);
+      margin-top: 20px;
+      border-radius: var(--border-radius);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .veil {
+      background: #ddd;
+      color: transparent;
+      text-shadow: 0 0 5px rgba(0,0,0,0.5);
+      padding: 15px;
+      border-radius: var(--border-radius);
+      user-select: none;
+    }
+
+    .revealed {
+      color: black;
+      text-shadow: none;
+    }
+
+    /* Control buttons */
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .controls button.learned { background: var(--primary-color); }
+    .controls button.easy { background: var(--secondary-color); }
+    .controls button.hard { background: var(--warning-color); }
+    .controls button.forgot { background: var(--danger-color); }
+
+    /* Progress bar */
+    .progress-bar {
+      height: 20px;
+      width: 100%;
+      display: flex;
+      margin-top: 20px;
+      border-radius: var(--border-radius);
+      overflow: hidden;
+    }
+
+    .bar-learned { background: var(--primary-color); }
+    .bar-easy { background: var(--secondary-color); }
+    .bar-hard { background: var(--warning-color); }
+    .bar-forgot { background: var(--danger-color); }
+
+    /* Button group */
+    .button-group {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin-top: 10px;
+      padding: 5px;
+    }
+
+    .button-group button {
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .button-group button.reset {
+      background-color: var(--secondary-color);
+      color: #333;
+    }
+
+    .button-group button.delete {
+      background-color: var(--danger-color);
+      color: #333;
+    }
+
+    .button-group button.modify {
+      background-color: var(--primary-color);
+      color: #333;
+    }
+
+    .button-group button.export {
+      background-color: #f7e1a0;
+      color: #333;
+    }
+
+    .button-group button i {
+      margin-right: 5px;
+    }
+
+    /* Section spacing */
+    .study-section {
+      margin-top: 60px;
+      padding-top: 30px;
+      border-top: 2px solid #ddd;
+      margin-bottom: 40px;
+    }
+
+    /* iOS specific styles */
+    @supports (-webkit-touch-callout: none) {
+      .button-group {
+        grid-template-columns: 1fr;
+      }
+      
+      .button-group button {
+        padding: 15px;
+        margin-bottom: 8px;
+      }
+    }
+
+    /* Mobile responsive */
+    @media (max-width: 480px) {
+      :root { --padding: 15px; }
+      h1 { font-size: 24px; }
+      h2 { font-size: 20px; }
+    }
+  </style>
+</head>
+<body>
+  <h1>Flashcards Studio</h1>
+
+  <h2>Gestione Mazzi</h2>
+  <select id="deckSelector" onchange="changeDeck()"></select>
+  <input id="newDeckName" placeholder="Nome nuovo mazzo">
+  <button onclick="createDeck()">Crea Mazzo</button>
+
+  <div class="button-group">
+    <button class="reset" onclick="resetStatuses()"><i class="fas fa-sync-alt"></i> Resetta</button>
+    <button class="delete" onclick="deleteDeck()"><i class="fas fa-times"></i> Elimina Mazzo</button>
+    <button class="modify" onclick="toggleFlashcardList()"><i class="fas fa-cogs"></i> Modifica</button>
+    <button class="export" onclick="exportDeck()"><i class="fas fa-file-export"></i> Esporta</button>
+  </div>
+
+  <h2>Nuova Flashcard</h2>
+  <input id="question" placeholder="Domanda">
+  <textarea id="answer" placeholder="Risposta"></textarea>
+  <button onclick="addCard()">Aggiungi</button>
+
+  <h2>Importa Flashcards</h2>
+  <input type="file" id="importFile" accept=".txt">
+  <button onclick="importCards()">Importa Mazzo</button>
+
+  <div class="study-section">
+    <h2><i class="fas fa-book"></i> Sessione di studio</h2>
+    <div>
+      <button onclick="startStudy()"><i class="fas fa-book-open"></i> Inizia sessione di studio</button>
+      <button onclick="endStudy()">Termina sessione</button>
+    </div>
+
+    <div class="progress-bar" id="progressBar"></div>
+    <div id="progressText" style="margin-top: 5px; font-weight: bold;"></div>
+
+    <div id="study" class="flashcard" style="display:none">
+      <div id="cardQuestion"></div>
+      <div id="cardAnswer" class="veil" onclick="revealAnswer()">Clicca per mostrare la risposta</div>
+      <div class="controls">
+        <button class="learned" onclick="markCard('learned')">Imparata</button>
+        <button class="easy" onclick="markCard('easy')">Facile</button>
+        <button class="hard" onclick="markCard('hard')">Difficile</button>
+        <button class="forgot" onclick="markCard('forgot')">Non ricordata</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="cardList" style="display:none">
+    <h2>Modifica Flashcards</h2>
+  </div>
+
+  <script>
+    // State management
+    const state = {
+      decks: JSON.parse(localStorage.getItem("decks")) || { "Default": [] },
+      currentDeck: null,
+      queue: [],
+      current: null
+    };
+
+    state.currentDeck = Object.keys(state.decks)[0] || "Default";
+
+    // Core functions
+    const saveDecks = () => localStorage.setItem("decks", JSON.stringify(state.decks));
+
+    const updateDeckSelector = () => {
+      const selector = document.getElementById("deckSelector");
+      selector.innerHTML = Object.keys(state.decks)
+        .map(deck => `<option value="${deck}" ${deck === state.currentDeck ? 'selected' : ''}>${deck}</option>`)
+        .join('');
+      updateProgressBar();
+    };
+
+    const changeDeck = () => {
+      state.currentDeck = document.getElementById("deckSelector").value;
+      updateProgressBar();
+    };
+
+    const createDeck = () => {
+      const name = document.getElementById("newDeckName").value.trim();
+      if (name && !state.decks[name]) {
+        state.decks[name] = [];
+        state.currentDeck = name;
+        saveDecks();
+        updateDeckSelector();
+        document.getElementById("newDeckName").value = "";
+        alert("Mazzo creato.");
+      }
+    };
+
+    const addCard = () => {
+      const q = document.getElementById("question").value.trim();
+      const a = document.getElementById("answer").value.trim();
+      if (q && a) {
+        state.decks[state.currentDeck].push({ question: q, answer: a, status: "new" });
+        saveDecks();
+        document.getElementById("question").value = "";
+        document.getElementById("answer").value = "";
+        updateProgressBar();
+        alert("Flashcard aggiunta.");
+      }
+    };
+
+    const importCards = () => {
+      const file = document.getElementById("importFile").files[0];
+      if (!file) {
+        alert("Seleziona un file .txt.");
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const lines = e.target.result.split(/\r?\n/);
+          let question = null;
+          let answer = [];
+
+          lines.forEach(line => {
+            const trimmedLine = line.trim();
+            if (trimmedLine.endsWith("?")) {
+              if (question && answer.length > 0) {
+                state.decks[state.currentDeck].push({
+                  question,
+                  answer: answer.join("\n"),
+                  status: "new"
+                });
+                answer = [];
+              }
+              question = trimmedLine;
+            } else if (trimmedLine === "") {
+              if (question && answer.length > 0) {
+                state.decks[state.currentDeck].push({
+                  question,
+                  answer: answer.join("\n"),
+                  status: "new"
+                });
+                question = null;
+                answer = [];
+              }
+            } else if (trimmedLine && question) {
+              answer.push(trimmedLine);
+            }
+          });
+
+          // Handle last card if exists
+          if (question && answer.length > 0) {
+            state.decks[state.currentDeck].push({
+              question,
+              answer: answer.join("\n"),
+              status: "new"
+            });
+          }
+
+          saveDecks();
+          updateProgressBar();
+          document.getElementById("importFile").value = ""; // Reset file input
+          alert("Importazione completata con successo.");
+        } catch (error) {
+          console.error("Error importing cards:", error);
+          alert("Errore durante l'importazione. Verifica il formato del file.");
+        }
+      };
+
+      reader.onerror = () => {
+        alert("Errore nella lettura del file.");
+      };
+
+      reader.readAsText(file);
+    };
+
+    function resetStatuses() {
+      // Show initial alert
+      alert("Stai per resettare tutte le carte del mazzo '" + state.currentDeck + "'");
+      
+      // Create confirmation button
+      const resetButton = document.createElement('button');
+      Object.assign(resetButton.style, {
+        backgroundColor: '#a0c4ff',
+        color: '#333',
+        padding: '15px',
+        marginTop: '10px',
+        width: '100%',
+        borderRadius: '8px',
+        border: 'none',
+        fontWeight: 'bold'
+      });
+      resetButton.innerText = 'Conferma Reset';
+      
+      // Add button after the deck selector
+      const deckSelector = document.getElementById('deckSelector');
+      deckSelector.parentNode.insertBefore(resetButton, deckSelector.nextSibling);
+      
+      // Handle reset action
+      resetButton.onclick = () => {
+        try {
+          // Reset all cards
+          state.decks[state.currentDeck].forEach(card => {
+            card.status = "new";
+          });
+          
+          // Save and update
+          saveDecks();
+          updateProgressBar();
+          
+          // Remove confirmation button
+          resetButton.remove();
+          
+          // Show success message
+          alert('Stati resettati con successo');
+        } catch (error) {
+          console.error("Error resetting statuses:", error);
+          alert("Errore durante il reset degli stati.");
+          resetButton.remove();
+        }
+      };
+      
+      // Remove button after 5 seconds if not clicked
+      setTimeout(() => {
+        if (resetButton.parentNode) {
+          resetButton.remove();
+        }
+      }, 5000);
+    }
+
+    const deleteDeck = () => {
+      alert("Stai per eliminare il mazzo '" + state.currentDeck + "'");
+      
+      const deleteButton = document.createElement('button');
+      Object.assign(deleteButton.style, {
+        backgroundColor: '#ff4d4d',
+        color: 'white',
+        padding: '15px',
+        marginTop: '10px',
+        width: '100%',
+        borderRadius: '8px',
+        border: 'none'
+      });
+      deleteButton.innerText = 'Conferma eliminazione';
+      
+      const deckSelector = document.getElementById('deckSelector');
+      deckSelector.parentNode.insertBefore(deleteButton, deckSelector.nextSibling);
+      
+      deleteButton.onclick = () => {
+        delete state.decks[state.currentDeck];
+        if (Object.keys(state.decks).length === 0) state.decks['Default'] = [];
+        state.currentDeck = Object.keys(state.decks)[0];
+        saveDecks();
+        updateDeckSelector();
+        deleteButton.remove();
+        alert('Mazzo eliminato');
+      };
+      
+      setTimeout(() => deleteButton.remove(), 5000);
+    };
+
+    const startStudy = () => {
+      state.queue = state.decks[state.currentDeck]
+        .filter(c => c.status !== "learned")
+        .flatMap(c => Array(c.status === "forgot" ? 5 : c.status === "hard" ? 3 : c.status === "easy" ? 1 : 2).fill(c));
+      
+      if (!state.queue.length) {
+        alert("Tutte le carte sono state imparate.");
+        return;
+      }
+      
+      state.queue = shuffle(state.queue);
+      nextCard();
+    };
+
+    const endStudy = () => document.getElementById("study").style.display = "none";
+
+    const nextCard = () => {
+      if (!state.queue.length) return endStudy();
+      state.current = state.queue.shift();
+      const cardAnswer = document.getElementById("cardAnswer");
+      document.getElementById("cardQuestion").textContent = state.current.question;
+      cardAnswer.textContent = "Clicca per mostrare la risposta";
+      cardAnswer.classList.remove("revealed");
+      document.getElementById("study").style.display = "block";
+    };
+
+    const revealAnswer = () => {
+      const cardAnswer = document.getElementById("cardAnswer");
+      cardAnswer.textContent = state.current.answer;
+      cardAnswer.classList.add("revealed");
+    };
+
+    const markCard = status => {
+      state.current.status = status;
+      if (status === 'learned') {
+        state.queue = state.queue.filter(card => card !== state.current);
+      }
+      saveDecks();
+      updateProgressBar();
+      nextCard();
+    };
+
+    const updateProgressBar = () => {
+      const deck = state.decks[state.currentDeck];
+      const total = deck.length;
+      const counts = deck.reduce((acc, card) => {
+        acc[card.status] = (acc[card.status] || 0) + 1;
+        return acc;
+      }, {});
+      
+      const bar = document.getElementById("progressBar");
+      bar.innerHTML = ["learned", "easy", "hard", "forgot"]
+        .map(status => counts[status] ? 
+          `<div class="bar-${status}" style="width:${counts[status]/total*100}%"></div>` : '')
+        .join('');
+      
+      document.getElementById("progressText").textContent = `${counts.learned || 0}/${total} Imparate`;
+    };
+
+    const shuffle = array => {
+      for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+      }
+      return array;
+    };
+
+    function toggleFlashcardList() {
+      const cardList = document.getElementById("cardList");
+      cardList.innerHTML = "<h2>Modifica Flashcards</h2>";
+      
+      if (cardList.style.display === "none") {
+        state.decks[state.currentDeck].forEach((card, i) => {
+          const div = document.createElement("div");
+          div.className = "card-item";
+          
+          // Create question section
+          const questionLabel = document.createElement("div");
+          questionLabel.innerHTML = "<strong>Domanda:</strong>";
+          
+          const questionArea = document.createElement("textarea");
+          questionArea.value = card.question;
+          questionArea.style.marginBottom = "15px";
+          questionArea.addEventListener("change", () => {
+            state.decks[state.currentDeck][i].question = questionArea.value;
+            saveDecks();
+          });
+          
+          // Create answer section
+          const answerLabel = document.createElement("div");
+          answerLabel.innerHTML = "<strong>Risposta:</strong>";
+          
+          const answerArea = document.createElement("textarea");
+          answerArea.value = card.answer;
+          answerArea.style.marginBottom = "15px";
+          answerArea.addEventListener("change", () => {
+            state.decks[state.currentDeck][i].answer = answerArea.value;
+            saveDecks();
+          });
+          
+          // Create delete button
+          const deleteButton = document.createElement("button");
+          deleteButton.className = "delete-card";
+          deleteButton.innerHTML = '<i class="fas fa-trash"></i> Elimina';
+          deleteButton.style.cssText = `
+            background-color: #ff6961;
+            color: white;
+            padding: 8px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            width: auto;
+            margin-top: 5px;
+          `;
+          
+          deleteButton.addEventListener("click", () => {
+            if (confirm("Vuoi eliminare questa flashcard?")) {
+              state.decks[state.currentDeck].splice(i, 1);
+              saveDecks();
+              toggleFlashcardList(); // Refresh the list
+              updateProgressBar();
+            }
+          });
+          
+          // Add all elements to the card div
+          div.appendChild(questionLabel);
+          div.appendChild(questionArea);
+          div.appendChild(answerLabel);
+          div.appendChild(answerArea);
+          div.appendChild(deleteButton);
+          
+          cardList.appendChild(div);
+        });
+        
+        // Add styles for card items
+        const style = document.createElement('style');
+        style.textContent = `
+          .card-item {
+            background: white;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+          }
+          .card-item textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+            margin-top: 5px;
+          }
+        `;
+        document.head.appendChild(style);
+        
+        cardList.style.display = "block";
+      } else {
+        cardList.style.display = "none";
+      }
+    }
+
+    function exportDeck() {
+      const deck = state.decks[state.currentDeck];
+      if (!deck.length) {
+        alert("Il mazzo " + state.currentDeck + " è vuoto.");
+        return;
+      }
+
+      // Generate content
+      let content = "";
+      deck.forEach(card => {
+        content += card.question + "\n" + card.answer + "\n\n";
+      });
+
+      // Create file content
+      const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+      const url = window.URL.createObjectURL(blob);
+      
+      // Create hidden link and trigger download
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${state.currentDeck}.txt`;
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      
+      // Create a click event
+      const event = new MouseEvent('click');
+      link.dispatchEvent(event);
+      
+      // Cleanup
+      setTimeout(() => {
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      }, 100);
+    }
+
+    // Initialize
+    updateDeckSelector();
+  </script>
+</body>
+</html>
