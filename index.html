@@ -1,0 +1,1583 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <title>Flashcards Studio</title>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <style>
+    :root {
+      --primary-color: #a8e6a1;
+      --secondary-color: #a0c4ff;
+      --warning-color: #ffb347;
+      --danger-color: #ff6961;
+      --padding: 20px;
+      --border-radius: 8px;
+      --safe-area-top: env(safe-area-inset-top);
+      --safe-area-bottom: env(safe-area-inset-bottom);
+      --pdf-width: 816px; /* 8.5 inches at 96 DPI (standard PDF width) */
+      --section-border: 1px solid #000;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+      -webkit-touch-callout: none;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      padding: var(--padding);
+      padding-top: calc(var(--padding) + var(--safe-area-top));
+      padding-bottom: calc(var(--padding) + var(--safe-area-bottom));
+      background: #e0e0e0; /* Darker background to make the PDF-like container stand out */
+      margin: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .app-container {
+      background: #f4f4f4;
+      width: var(--pdf-width);
+      margin: 0 auto;
+      padding: var(--padding);
+      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+      border-radius: var(--border-radius);
+    }
+
+    h1, h2 { text-align: center; }
+
+    /* Program section styles */
+    .program-section {
+      border: var(--section-border);
+      border-radius: var(--border-radius);
+      padding: var(--padding);
+      margin-bottom: 25px;
+      background: white;
+    }
+
+    /* Section header styles */
+    .section-header {
+      cursor: pointer;
+      padding: 10px;
+      border-radius: var(--border-radius);
+      background: #f0f0f0;
+      transition: background-color 0.2s;
+      margin-bottom: 10px;
+    }
+
+    .section-header:hover {
+      background: #e0e0e0;
+    }
+
+    .section-header h2 {
+      margin: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .toggle-icon {
+      margin-left: 10px;
+      transition: transform 0.3s;
+    }
+
+    .toggle-icon.rotated {
+      transform: rotate(180deg);
+    }
+
+    .section-icon {
+      margin-right: 12px; /* Increased spacing between icon and text */
+    }
+
+    /* Common input styles */
+    input, textarea, select, button {
+      font: inherit;
+      padding: 12px;
+      margin-top: 5px;
+      width: 100%;
+      border-radius: var(--border-radius);
+      border: 1px solid #ddd;
+      appearance: none;
+    }
+
+    /* Common button styles */
+    button {
+      cursor: pointer;
+      touch-action: manipulation;
+      user-select: none;
+      border: none;
+    }
+
+    button:active { opacity: 0.7; }
+
+    /* Card styles */
+    .flashcard {
+      background: white;
+      padding: var(--padding);
+      margin-top: 20px;
+      border-radius: var(--border-radius);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .veil {
+      background: #ddd;
+      color: transparent;
+      text-shadow: 0 0 5px rgba(0,0,0,0.5);
+      padding: 15px;
+      border-radius: var(--border-radius);
+      user-select: none;
+    }
+
+    .revealed {
+      color: black;
+      text-shadow: none;
+    }
+
+    /* Control buttons */
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .controls button.learned { background: var(--primary-color); }
+    .controls button.easy { background: var(--secondary-color); }
+    .controls button.hard { background: var(--warning-color); }
+    .controls button.forgot { background: var(--danger-color); }
+
+    /* Progress bar */
+    .progress-bar {
+      height: 20px;
+      width: 100%;
+      display: flex;
+      margin-top: 20px;
+      border-radius: var(--border-radius);
+      overflow: hidden;
+    }
+
+    .bar-learned { background: var(--primary-color); }
+    .bar-easy { background: var(--secondary-color); }
+    .bar-hard { background: var(--warning-color); }
+    .bar-forgot { background: var(--danger-color); }
+
+    /* Button group */
+    .button-group {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin-top: 10px;
+      padding: 5px;
+    }
+
+    .button-group button {
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .button-group button.reset {
+      background-color: var(--secondary-color);
+      color: #333;
+    }
+
+    .button-group button.delete {
+      background-color: var(--danger-color);
+      color: #333;
+    }
+
+    .button-group button.modify {
+      background-color: var(--primary-color);
+      color: #333;
+    }
+
+    .button-group button.export {
+      background-color: #f7e1a0;
+      color: #333;
+    }
+
+    .button-group button i {
+      margin-right: 5px;
+    }
+
+    /* Section spacing */
+    .study-section {
+      margin-top: 60px;
+      padding-top: 30px;
+      border-top: 2px solid #ddd;
+      margin-bottom: 40px;
+    }
+
+    /* iOS specific styles */
+    @supports (-webkit-touch-callout: none) {
+      .button-group {
+        grid-template-columns: 1fr;
+      }
+      
+      .button-group button {
+        padding: 15px;
+        margin-bottom: 8px;
+      }
+    }
+
+    /* Mobile responsive */
+    @media (max-width: 850px) {
+      :root { --padding: 15px; }
+      h1 { font-size: 24px; }
+      h2 { font-size: 20px; }
+      .app-container {
+        width: 100%;
+      }
+    }
+
+    /* Deck action buttons - ensure same size */
+    .deck-action-btn {
+      width: auto;
+      min-width: 160px;
+      margin: 0;
+      white-space: nowrap;
+      color: #333;
+      padding: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .deck-action-btn i {
+      margin-right: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <h1>Flashcards Studio</h1>
+  
+    <div class="program-section">
+      <h2>Gestione Mazzi</h2>
+      <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px;">
+        <select id="deckSelector" onchange="changeDeck()" style="margin: 0; flex-grow: 1;"></select>
+        <button onclick="deleteDeck()" class="deck-action-btn" style="background-color: var(--danger-color);">
+          <i class="fas fa-trash"></i> Elimina Mazzo
+        </button>
+      </div>
+      <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px;">
+        <input id="newDeckName" placeholder="Nome nuovo mazzo" style="flex-grow: 1; margin: 0;">
+        <button onclick="createDeck()" class="deck-action-btn" style="background-color: var(--primary-color);">
+          <i class="fas fa-plus"></i> Crea Mazzo
+        </button>
+      </div>
+    
+      <div class="button-group">
+        <button class="reset" onclick="resetStatuses()"><i class="fas fa-sync-alt"></i> Resetta</button>
+        <button class="delete" onclick="deleteAllCards()" style="background-color: #d8c0ef;"><i class="fas fa-trash-alt"></i> Elimina Flashcards</button>
+        <button class="modify" onclick="toggleFlashcardList()"><i class="fas fa-cogs"></i> Modifica</button>
+        <button class="export" onclick="exportDeck()"><i class="fas fa-file-export"></i> Esporta</button>
+      </div>
+    </div>
+
+    <div class="program-section">
+      <div class="section-header" onclick="toggleNewCardSection()">
+        <h2><i class="fas fa-plus-circle section-icon"></i> Nuova Flashcard <i class="fas fa-chevron-down toggle-icon"></i></h2>
+      </div>
+      <div id="newCardSection" style="display:none;">
+        <input id="question" placeholder="Domanda">
+        <textarea id="answer" placeholder="Risposta"></textarea>
+        <button onclick="addCard()">Aggiungi</button>
+      </div>
+    </div>
+
+    <div class="program-section">
+      <h2>Importa Flashcards da PDF</h2>
+      <input type="file" id="importFile" accept=".pdf">
+      <button onclick="importCards()">Importa Mazzo</button>
+    </div>
+  
+    <div class="program-section study-section">
+      <h2><i class="fas fa-book"></i> Sessione di studio</h2>
+      <div>
+        <button onclick="startStudy()"><i class="fas fa-book-open"></i> Inizia sessione di studio</button>
+        <button onclick="endStudy()">Termina sessione</button>
+      </div>
+  
+      <div class="progress-bar" id="progressBar"></div>
+      <div id="progressText" style="margin-top: 5px; font-weight: bold;"></div>
+  
+      <div id="study" class="flashcard" style="display:none">
+        <div class="controls">
+          <button class="learned" onclick="markCard('learned')">Imparata</button>
+          <button class="easy" onclick="markCard('easy')">Facile</button>
+          <button class="hard" onclick="markCard('hard')">Difficile</button>
+          <button class="forgot" onclick="markCard('forgot')">Non ricordata</button>
+        </div>
+        <div id="cardQuestion" style="margin-top: 20px;"></div>
+        <div id="cardAnswer" class="veil" onclick="revealAnswer()">Clicca per mostrare la risposta</div>
+        <div id="referencePage" style="display:none; margin-top: 15px; border: 1px solid #ddd; padding: 15px; border-radius: 8px; background-color: #f9f9f9; max-height: 300px; overflow-y: auto;"></div>
+      </div>
+    </div>
+  
+    <div id="cardList" class="program-section" style="display:none">
+      <h2>Modifica Flashcards</h2>
+    </div>
+  </div>
+
+  <script>
+    // PDF.js initialization
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    
+    // IndexedDB initialization for storing PDF data
+    let db;
+    const dbName = "flashcardsDB";
+    const pdfStoreName = "pdfStore";
+    
+    // Open IndexedDB
+    const openDB = () => {
+      return new Promise((resolve, reject) => {
+        const request = indexedDB.open(dbName, 1);
+        
+        request.onerror = event => {
+          console.error("IndexedDB error:", event.target.error);
+          reject("Could not open IndexedDB");
+        };
+        
+        request.onsuccess = event => {
+          db = event.target.result;
+          console.log("IndexedDB opened successfully");
+          resolve(db);
+        };
+        
+        request.onupgradeneeded = event => {
+          const db = event.target.result;
+          if (!db.objectStoreNames.contains(pdfStoreName)) {
+            db.createObjectStore(pdfStoreName);
+            console.log("PDF store created");
+          }
+        };
+      });
+    };
+    
+    // Store PDF in IndexedDB
+    const storePdfInDB = (pdfName, pdfData) => {
+      return new Promise((resolve, reject) => {
+        if (!db) {
+          reject("Database not initialized");
+          return;
+        }
+        
+        const transaction = db.transaction([pdfStoreName], "readwrite");
+        const store = transaction.objectStore(pdfStoreName);
+        
+        const request = store.put(pdfData, pdfName);
+        
+        request.onsuccess = () => {
+          console.log("PDF stored in IndexedDB");
+          resolve();
+        };
+        
+        request.onerror = event => {
+          console.error("Error storing PDF:", event.target.error);
+          reject("Failed to store PDF");
+        };
+      });
+    };
+    
+    // Get PDF from IndexedDB
+    const getPdfFromDB = (pdfName) => {
+      return new Promise((resolve, reject) => {
+        if (!db) {
+          reject("Database not initialized");
+          return;
+        }
+        
+        const transaction = db.transaction([pdfStoreName], "readonly");
+        const store = transaction.objectStore(pdfStoreName);
+        
+        const request = store.get(pdfName);
+        
+        request.onsuccess = () => {
+          if (request.result) {
+            console.log("PDF retrieved from IndexedDB");
+            resolve(request.result);
+          } else {
+            console.log("PDF not found in IndexedDB");
+            resolve(null);
+          }
+        };
+        
+        request.onerror = event => {
+          console.error("Error retrieving PDF:", event.target.error);
+          reject("Failed to retrieve PDF");
+        };
+      });
+    };
+    
+    // State management
+    const state = {
+      decks: JSON.parse(localStorage.getItem("decks")) || { "Default": [] },
+      currentDeck: null,
+      queue: [],
+      current: null,
+      uiState: {
+        newCardSectionVisible: false,
+        studySessionActive: false,
+        editingFlashcardsActive: false
+      }
+    };
+
+    state.currentDeck = Object.keys(state.decks)[0] || "Default";
+
+    // Core functions
+    const saveDecks = () => localStorage.setItem("decks", JSON.stringify(state.decks));
+    const saveUIState = () => localStorage.setItem("uiState", JSON.stringify(state.uiState));
+
+    const updateDeckSelector = () => {
+      const selector = document.getElementById("deckSelector");
+      selector.innerHTML = Object.keys(state.decks)
+        .map(deck => `<option value="${deck}" ${deck === state.currentDeck ? 'selected' : ''}>${deck}</option>`)
+        .join('');
+      updateProgressBar();
+    };
+
+    const changeDeck = () => {
+      state.currentDeck = document.getElementById("deckSelector").value;
+      updateProgressBar();
+    };
+
+    const createDeck = () => {
+      const name = document.getElementById("newDeckName").value.trim();
+      if (name && !state.decks[name]) {
+        state.decks[name] = [];
+        state.currentDeck = name;
+        saveDecks();
+        updateDeckSelector();
+        document.getElementById("newDeckName").value = "";
+        alert("Mazzo creato.");
+      }
+    };
+
+    const addCard = () => {
+      const q = document.getElementById("question").value.trim();
+      const a = document.getElementById("answer").value.trim();
+      if (q && a) {
+        state.decks[state.currentDeck].push({ question: q, answer: a, status: "new" });
+        saveDecks();
+        document.getElementById("question").value = "";
+        document.getElementById("answer").value = "";
+        updateProgressBar();
+        alert("Flashcard aggiunta.");
+      }
+    };
+
+    const importCards = async () => {
+      const file = document.getElementById("importFile").files[0];
+      if (!file) {
+        alert("Seleziona un file .pdf.");
+        return;
+      }
+
+      try {
+        // Display loading message
+        const loadingMsg = document.createElement('div');
+        loadingMsg.textContent = 'Elaborazione PDF in corso...';
+        loadingMsg.style.marginTop = '10px';
+        loadingMsg.style.fontWeight = 'bold';
+        document.getElementById("importFile").parentNode.appendChild(loadingMsg);
+
+        // Verify file is a PDF by checking extension
+        if (!file.name.toLowerCase().endsWith('.pdf')) {
+          throw new Error("Il file selezionato non è un PDF. Seleziona un file con estensione .pdf");
+        }
+
+        // Read the file once
+        const arrayBuffer = await file.arrayBuffer();
+        // Store as Uint8Array - making a copy to avoid detachment issues
+        const pdfData = new Uint8Array(arrayBuffer.slice(0));
+        const pdfFilename = file.name;
+        
+        console.log("PDF size:", pdfData.length, "bytes");
+        
+        // Only store the file name for reference
+        try {
+          localStorage.setItem('lastImportedPdfName', pdfFilename);
+        } catch (storageError) {
+          console.warn("Could not store PDF name in localStorage:", storageError);
+        }
+        
+        // Store PDF data in IndexedDB
+        try {
+          await storePdfInDB(pdfFilename, pdfData);
+          console.log("PDF stored in IndexedDB successfully");
+        } catch (dbError) {
+          console.warn("Failed to store PDF in IndexedDB:", dbError);
+          // Continue anyway, will use in-memory version for this session
+        }
+        
+        // Store PDF data as a base64 string to avoid detached buffer issues
+        window.currentPdfBase64 = arrayBufferToBase64(pdfData);
+        
+        console.log("Attempting to load PDF");
+        
+        // Parse the PDF with additional error checking
+        let pdf;
+        try {
+          // Create a fresh copy for PDF.js to avoid detachment issues
+          pdf = await pdfjsLib.getDocument({data: pdfData.slice(0)}).promise;
+          console.log("PDF loaded successfully with", pdf.numPages, "pages");
+        } catch (pdfError) {
+          console.error("PDF.js error:", pdfError);
+          throw new Error("Errore nel caricamento del PDF. Il file potrebbe essere danneggiato o in un formato non supportato.");
+        }
+        
+        const numPages = pdf.numPages;
+        
+        // Counters for import statistics
+        let totalNewCardsAdded = 0;
+        let totalDuplicatesFound = 0;
+        
+        let flashcardsPageFound = false;
+        let flashcardPagesStart = 0;
+        
+        // First, find the "FLASHCARDS" page
+        for (let i = 1; i <= numPages; i++) {
+          try {
+            const page = await pdf.getPage(i);
+            const textContent = await page.getTextContent();
+            const pageText = textContent.items.map(item => item.str).join(' ');
+            
+            console.log("Searching for FLASHCARDS on page", i);
+            
+            if (pageText.includes("FLASHCARDS")) {
+              flashcardsPageFound = true;
+              flashcardPagesStart = i + 1; // Start from the next page
+              console.log("FLASHCARDS page found at page", i);
+              break;
+            }
+          } catch (pageError) {
+            console.error("Error processing page", i, ":", pageError);
+            // Continue to next page even if one page fails
+          }
+        }
+        
+        if (!flashcardsPageFound) {
+          alert("Nessuna pagina con il titolo 'FLASHCARDS' trovata nel PDF.");
+          loadingMsg.remove();
+          return;
+        }
+        
+        // Now process all pages after the FLASHCARDS page
+        let currentSection = null;
+        let currentSectionPages = []; // Array to store multiple page references
+        let sectionFlashcards = [];
+        
+        for (let i = flashcardPagesStart; i <= numPages; i++) {
+          try {
+            const page = await pdf.getPage(i);
+            const textContent = await page.getTextContent();
+            console.log("Processing flashcard page", i);
+            
+            const lines = extractLinesFromTextContent(textContent);
+            console.log("Extracted", lines.length, "lines from page", i);
+            
+            for (let j = 0; j < lines.length; j++) {
+              const line = lines[j].trim();
+              
+              // Check for section headers with two patterns:
+              // 1. Single page: {Pagina "X"}
+              // 2. Page range: {Pagina "X"-"Y"}
+              
+              // First check for page range pattern
+              const rangeMatch = line.match(/^\{Pagina\s*[""]?(\d+)[""]?\s*-\s*[""]?(\d+)[""]?\}$/);
+              if (rangeMatch) {
+                console.log(`Found section header for page range ${rangeMatch[1]}-${rangeMatch[2]}`);
+                
+                // If we have a current section with flashcards, add them
+                if (currentSection !== null && sectionFlashcards.length > 0) {
+                  const result = processFlashcardsForSectionWithPages(sectionFlashcards, currentSectionPages, pdfFilename);
+                  totalNewCardsAdded += result.newCardsAdded;
+                  totalDuplicatesFound += result.duplicatesFound;
+                  sectionFlashcards = [];
+                }
+                
+                // Set new current section with multiple pages
+                const startPage = parseInt(rangeMatch[1]);
+                const endPage = parseInt(rangeMatch[2]);
+                
+                // Store all pages in the range
+                currentSectionPages = [];
+                currentSection = startPage; // Keep the first page as the main reference
+                
+                // Add all pages in the range (including start and end)
+                for (let p = startPage; p <= endPage; p++) {
+                  currentSectionPages.push(p);
+                }
+                
+                continue;
+              }
+              
+              // If not a range, check for single page pattern
+              const singleMatch = line.match(/^\{Pagina\s*[""]?(\d+)[""]?\}$/);
+              if (singleMatch) {
+                console.log("Found section header for page", singleMatch[1]);
+                
+                // If we have a current section with flashcards, add them
+                if (currentSection !== null && sectionFlashcards.length > 0) {
+                  const result = processFlashcardsForSectionWithPages(sectionFlashcards, currentSectionPages, pdfFilename);
+                  totalNewCardsAdded += result.newCardsAdded;
+                  totalDuplicatesFound += result.duplicatesFound;
+                  sectionFlashcards = [];
+                }
+                
+                // Set new current section with single page
+                currentSection = parseInt(singleMatch[1]);
+                currentSectionPages = [currentSection]; // Just one page in this case
+                continue;
+              }
+              
+              // Skip empty lines
+              if (line === "") continue;
+              
+              // If we have a current section, collect flashcard content
+              if (currentSection !== null) {
+                sectionFlashcards.push(line);
+              }
+            }
+          } catch (pageError) {
+            console.error("Error processing flashcard page", i, ":", pageError);
+            // Continue to next page even if one fails
+          }
+        }
+        
+        // Process any remaining flashcards in the last section
+        if (currentSection !== null && sectionFlashcards.length > 0) {
+          const result = processFlashcardsForSectionWithPages(sectionFlashcards, currentSectionPages, pdfFilename);
+          totalNewCardsAdded += result.newCardsAdded;
+          totalDuplicatesFound += result.duplicatesFound;
+        }
+        
+        saveDecks();
+        updateProgressBar();
+        document.getElementById("importFile").value = ""; // Reset file input
+        loadingMsg.remove();
+        
+        // Show import results with duplicate information
+        if (totalDuplicatesFound > 0) {
+          alert(`Importazione completata.\nAggiunte ${totalNewCardsAdded} nuove flashcard.\nTrovate ${totalDuplicatesFound} flashcard duplicate (mantenute con il loro progresso).`);
+        } else {
+          alert(`Importazione completata con successo. Aggiunte ${totalNewCardsAdded} flashcard.`);
+        }
+        
+      } catch (error) {
+        console.error("Error importing PDF:", error);
+        alert(`Errore durante l'importazione: ${error.message || "Controlla formato del file"}`);
+        const loadingMsg = document.querySelector('div[textContent="Elaborazione PDF in corso..."]');
+        if (loadingMsg) loadingMsg.remove();
+      }
+    };
+
+    // Helper function to convert ArrayBuffer to base64 string
+    function arrayBufferToBase64(buffer) {
+      let binary = '';
+      const bytes = new Uint8Array(buffer);
+      const len = bytes.byteLength;
+      for (let i = 0; i < len; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      return window.btoa(binary);
+    }
+    
+    // Helper function to convert base64 string to Uint8Array
+    function base64ToUint8Array(base64) {
+      const binary_string = window.atob(base64);
+      const len = binary_string.length;
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i++) {
+        bytes[i] = binary_string.charCodeAt(i);
+      }
+      return bytes;
+    }
+
+    function resetStatuses() {
+      // Show initial alert
+      alert("Stai per resettare tutte le carte del mazzo '" + state.currentDeck + "'");
+      
+      // Create confirmation button
+      const resetButton = document.createElement('button');
+      Object.assign(resetButton.style, {
+        backgroundColor: '#a0c4ff',
+        color: '#333',
+        padding: '15px',
+        marginTop: '10px',
+        width: '100%',
+        borderRadius: '8px',
+        border: 'none',
+        fontWeight: 'bold'
+      });
+      resetButton.innerText = 'Conferma Reset';
+      
+      // Add button after the deck selector
+      const deckSelector = document.getElementById('deckSelector');
+      deckSelector.parentNode.insertBefore(resetButton, deckSelector.nextSibling);
+      
+      // Handle reset action
+      resetButton.onclick = () => {
+        try {
+          // Reset all cards
+          state.decks[state.currentDeck].forEach(card => {
+            card.status = "new";
+          });
+          
+          // Save and update
+          saveDecks();
+          updateProgressBar();
+          
+          // Remove confirmation button
+          resetButton.remove();
+          
+          // Show success message
+          alert('Stati resettati con successo');
+        } catch (error) {
+          console.error("Error resetting statuses:", error);
+          alert("Errore durante il reset degli stati.");
+          resetButton.remove();
+        }
+      };
+      
+      // Remove button after 5 seconds if not clicked
+      setTimeout(() => {
+        if (resetButton.parentNode) {
+          resetButton.remove();
+        }
+      }, 5000);
+    }
+
+    const deleteDeck = () => {
+      alert("Stai per eliminare il mazzo '" + state.currentDeck + "'");
+      
+      const deleteButton = document.createElement('button');
+      Object.assign(deleteButton.style, {
+        backgroundColor: '#ff4d4d',
+        color: 'white',
+        padding: '15px',
+        marginTop: '10px',
+        width: '100%',
+        borderRadius: '8px',
+        border: 'none'
+      });
+      deleteButton.innerText = 'Conferma eliminazione';
+      
+      const deckSelector = document.getElementById('deckSelector');
+      deckSelector.parentNode.insertBefore(deleteButton, deckSelector.nextSibling);
+      
+      deleteButton.onclick = () => {
+        delete state.decks[state.currentDeck];
+        if (Object.keys(state.decks).length === 0) state.decks['Default'] = [];
+        state.currentDeck = Object.keys(state.decks)[0];
+        saveDecks();
+        updateDeckSelector();
+        deleteButton.remove();
+        alert('Mazzo eliminato');
+      };
+      
+      setTimeout(() => deleteButton.remove(), 5000);
+    };
+
+    // Function to delete all flashcards in the current deck
+    function deleteAllCards() {
+      // Display confirmation alert
+      alert("Stai per eliminare tutte le flashcards del mazzo '" + state.currentDeck + "'");
+      
+      // Create confirmation button
+      const deleteButton = document.createElement('button');
+      Object.assign(deleteButton.style, {
+        backgroundColor: '#d8c0ef',
+        color: '#333',
+        padding: '15px',
+        marginTop: '10px',
+        width: '100%',
+        borderRadius: '8px',
+        border: 'none'
+      });
+      deleteButton.innerText = 'Conferma elimina flashcards';
+      
+      // Add confirmation button below deck selector
+      const deckSelector = document.getElementById('deckSelector');
+      deckSelector.parentNode.insertBefore(deleteButton, deckSelector.nextSibling);
+      
+      // Handle click on confirmation button
+      deleteButton.onclick = () => {
+        // Empty the cards array for the current deck
+        state.decks[state.currentDeck] = [];
+        
+        // Save changes and update UI
+        saveDecks();
+        updateProgressBar();
+        deleteButton.remove();
+        alert('Tutte le flashcards sono state eliminate');
+      };
+      
+      // Remove confirmation button after 5 seconds if not clicked
+      setTimeout(() => {
+        if (deleteButton.parentNode) {
+          deleteButton.remove();
+        }
+      }, 5000);
+    }
+
+    const startStudy = () => {
+      // Close editing menu if open
+      if (state.uiState.editingFlashcardsActive) {
+        const cardList = document.getElementById("cardList");
+        cardList.style.display = "none";
+        state.uiState.editingFlashcardsActive = false;
+        saveUIState();
+      }
+      
+      state.queue = state.decks[state.currentDeck]
+        .filter(c => c.status !== "learned")
+        .flatMap(c => Array(c.status === "forgot" ? 5 : c.status === "hard" ? 3 : c.status === "easy" ? 1 : 2).fill(c));
+      
+      if (!state.queue.length) {
+        alert("Tutte le carte sono state imparate.");
+        return;
+      }
+      
+      state.queue = shuffle(state.queue);
+      state.uiState.studySessionActive = true; // Set session as active
+      saveUIState();
+      nextCard();
+    };
+
+    const endStudy = () => {
+      document.getElementById("study").style.display = "none";
+      state.uiState.studySessionActive = false;
+      saveUIState();
+    };
+
+    const nextCard = () => {
+      if (!state.queue.length) return endStudy();
+      state.current = state.queue.shift();
+      const cardAnswer = document.getElementById("cardAnswer");
+      document.getElementById("cardQuestion").textContent = state.current.question;
+      cardAnswer.textContent = "Clicca per mostrare la risposta";
+      cardAnswer.classList.remove("revealed");
+      
+      // Hide reference page
+      const referencePage = document.getElementById("referencePage");
+      referencePage.style.display = "none";
+      referencePage.innerHTML = ""; // Clear content
+      
+      document.getElementById("study").style.display = "block";
+    };
+
+    const revealAnswer = async () => {
+      const cardAnswer = document.getElementById("cardAnswer");
+      cardAnswer.textContent = state.current.answer;
+      cardAnswer.classList.add("revealed");
+      
+      // Show the reference page if page number is available
+      if (state.current.pageNumber) {
+        const referencePage = document.getElementById("referencePage");
+        
+        // Display PDF filename and page number(s)
+        const pdfFilename = state.current.pdfFilename || "PDF";
+        
+        // Check if we have additional pages to display
+        let pageDisplay = `${pdfFilename} - Pagina ${state.current.pageNumber}`;
+        
+        // If we have additional pages, append them
+        if (state.current.additionalPages && state.current.additionalPages.length > 0) {
+          pageDisplay += `, ${state.current.additionalPages.join(', ')}`;
+        }
+        
+        referencePage.innerHTML = `<strong>${pageDisplay}</strong>`;
+        referencePage.style.display = "block";
+        referencePage.style.maxHeight = "none";
+        
+        // Create container for PDF content
+        const pdfContainer = document.createElement('div');
+        pdfContainer.id = 'pdfCanvas';
+        pdfContainer.style.marginTop = '15px';
+        pdfContainer.style.width = '100%';
+        pdfContainer.style.display = 'flex';
+        pdfContainer.style.flexDirection = 'column';
+        pdfContainer.style.justifyContent = 'center';
+        pdfContainer.style.gap = '20px';
+        referencePage.appendChild(pdfContainer);
+        
+        try {
+          let pdfData;
+          
+          // Try to get the PDF data from IndexedDB first
+          try {
+            pdfData = await getPdfFromDB(pdfFilename);
+            if (pdfData) {
+              console.log("Using PDF data from IndexedDB");
+            }
+          } catch (dbError) {
+            console.warn("Could not retrieve PDF from IndexedDB:", dbError);
+          }
+          
+          // If not found in IndexedDB, try using in-memory data
+          if (!pdfData && window.currentPdfBase64) {
+            console.log("Using in-memory PDF data (from base64)");
+            pdfData = base64ToUint8Array(window.currentPdfBase64);
+          }
+          
+          if (pdfData) {
+            // First render the main page
+            await renderPdfPage(pdfData, state.current.pageNumber, pdfContainer);
+            
+            // Then render any additional pages
+            if (state.current.additionalPages && state.current.additionalPages.length > 0) {
+              for (const additionalPage of state.current.additionalPages) {
+                // Add a divider
+                const divider = document.createElement('div');
+                divider.style.width = '100%';
+                divider.style.height = '2px';
+                divider.style.backgroundColor = '#ddd';
+                divider.style.margin = '10px 0';
+                pdfContainer.appendChild(divider);
+                
+                // Add page label
+                const pageLabel = document.createElement('div');
+                pageLabel.innerHTML = `<strong>Pagina ${additionalPage}</strong>`;
+                pageLabel.style.marginBottom = '10px';
+                pdfContainer.appendChild(pageLabel);
+                
+                // Render the additional page
+                await renderPdfPage(pdfData, additionalPage, pdfContainer);
+              }
+            }
+          } else {
+            // If no PDF data is available
+            pdfContainer.innerHTML = `
+              <div style="padding: 20px; text-align: center; background-color: #fff3cd; border: 1px solid #ffeeba; border-radius: 8px;">
+                <p><i class="fas fa-exclamation-triangle" style="color: #856404; margin-right: 8px;"></i>PDF non disponibile in memoria.</p>
+                <p>Per visualizzare la pagina, reimporta il file "${pdfFilename}".</p>
+                <button id="reimportBtn" style="background-color: #007bff; color: white; border: none; padding: 8px 16px; border-radius: 4px; margin-top: 10px; cursor: pointer;">
+                  <i class="fas fa-file-import" style="margin-right: 5px;"></i>Importa PDF
+                </button>
+              </div>`;
+            
+            // Add click handler to the reimport button
+            document.getElementById('reimportBtn').addEventListener('click', () => {
+              // Scroll to the import section
+              const importSection = document.getElementById('importFile').parentNode;
+              importSection.scrollIntoView({ behavior: 'smooth' });
+              
+              // Add a highlight effect
+              const originalBackground = importSection.style.backgroundColor;
+              importSection.style.backgroundColor = '#ffffcc';
+              importSection.style.transition = 'background-color 1s';
+              
+              // Reset the background after animation
+              setTimeout(() => {
+                importSection.style.backgroundColor = originalBackground;
+              }, 2000);
+            });
+          }
+        } catch (error) {
+          console.error("Error rendering PDF page:", error);
+          pdfContainer.innerHTML = `<div style="color: red; padding: 20px;">Errore nel rendering della pagina: ${error.message}</div>`;
+        }
+      }
+    };
+    
+    // Helper function to render a PDF page
+    async function renderPdfPage(pdfData, pageNumber, container) {
+      try {
+        // Always create a fresh copy of the data to avoid detached buffer issues
+        const freshPdfData = pdfData.slice(0);
+        const pdf = await pdfjsLib.getDocument({data: freshPdfData}).promise;
+        
+        // Check if the page number is valid
+        if (pageNumber > 0 && pageNumber <= pdf.numPages) {
+          const page = await pdf.getPage(pageNumber);
+            
+            // Get the original page size
+            const originalViewport = page.getViewport({scale: 1.0});
+            
+            // Calculate scale to fit container width with a slight margin
+            const containerWidth = 776; // Container width minus padding
+            // Add a bit of extra width (105%) to ensure it's wide enough and doesn't require horizontal scrolling
+            const scale = (containerWidth / originalViewport.width) * 1.05;
+            
+            // Create viewport with calculated scale
+            const viewport = page.getViewport({scale: scale});
+            
+            // Create canvas for rendering
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            
+            // Set canvas dimensions
+            canvas.width = viewport.width;
+            canvas.height = viewport.height;
+            
+            // Make the canvas responsive to fit width without horizontal scrolling
+            canvas.style.width = '100%';
+            canvas.style.height = 'auto';
+            canvas.style.maxWidth = `${viewport.width}px`;
+            canvas.style.border = '1px solid #ddd';
+            
+          container.appendChild(canvas);
+            
+            // Render the PDF page
+            await page.render({
+              canvasContext: context,
+              viewport: viewport
+            }).promise;
+          } else {
+          container.innerHTML = `<div style="color: red; padding: 20px;">Pagina ${pageNumber} non trovata nel PDF.</div>`;
+          }
+        } catch (error) {
+        console.error("Error in renderPdfPage:", error);
+        container.innerHTML = `<div style="color: red; padding: 20px;">Errore nel rendering: ${error.message}</div>`;
+        }
+      }
+
+    const markCard = status => {
+      state.current.status = status;
+      if (status === 'learned') {
+        state.queue = state.queue.filter(card => card !== state.current);
+      }
+      saveDecks();
+      updateProgressBar();
+      nextCard();
+    };
+
+    const updateProgressBar = () => {
+      const deck = state.decks[state.currentDeck];
+      const total = deck.length;
+      const counts = deck.reduce((acc, card) => {
+        acc[card.status] = (acc[card.status] || 0) + 1;
+        return acc;
+      }, {});
+      
+      const bar = document.getElementById("progressBar");
+      bar.innerHTML = ["learned", "easy", "hard", "forgot"]
+        .map(status => counts[status] ? 
+          `<div class="bar-${status}" style="width:${counts[status]/total*100}%"></div>` : '')
+        .join('');
+      
+      document.getElementById("progressText").textContent = `${counts.learned || 0}/${total} Imparate`;
+    };
+
+    const shuffle = array => {
+      for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+      }
+      return array;
+    };
+
+    function toggleFlashcardList() {
+      const cardList = document.getElementById("cardList");
+      
+      if (cardList.style.display === "none") {
+        // Open editing mode
+        state.uiState.editingFlashcardsActive = true;
+        saveUIState();
+        
+        cardList.innerHTML = "<h2>Modifica Flashcards</h2>";
+        
+        state.decks[state.currentDeck].forEach((card, i) => {
+          const div = document.createElement("div");
+          div.className = "card-item";
+          
+          // Create question section
+          const questionLabel = document.createElement("div");
+          questionLabel.innerHTML = "<strong>Domanda:</strong>";
+          
+          const questionArea = document.createElement("textarea");
+          questionArea.value = card.question;
+          questionArea.style.marginBottom = "15px";
+          questionArea.addEventListener("change", () => {
+            state.decks[state.currentDeck][i].question = questionArea.value;
+            saveDecks();
+          });
+          
+          // Create answer section
+          const answerLabel = document.createElement("div");
+          answerLabel.innerHTML = "<strong>Risposta:</strong>";
+          
+          const answerArea = document.createElement("textarea");
+          answerArea.value = card.answer;
+          answerArea.style.marginBottom = "15px";
+          answerArea.addEventListener("change", () => {
+            state.decks[state.currentDeck][i].answer = answerArea.value;
+            saveDecks();
+          });
+          
+          // Add page number if available (improved for ranges)
+          if (card.pageNumber) {
+            const pageLabel = document.createElement("div");
+            let pageText = '';
+            if (card.additionalPages && card.additionalPages.length > 0) {
+              // Combine all pages and sort
+              const allPages = [card.pageNumber, ...card.additionalPages].sort((a, b) => a - b);
+              // Check if they are consecutive
+              let isConsecutive = true;
+              for (let k = 1; k < allPages.length; k++) {
+                if (allPages[k] !== allPages[k - 1] + 1) {
+                  isConsecutive = false;
+                  break;
+                }
+              }
+              if (isConsecutive) {
+                pageText = `${allPages[0]}-${allPages[allPages.length - 1]}`;
+              } else {
+                pageText = allPages.join(', ');
+              }
+            } else {
+              pageText = card.pageNumber;
+            }
+            pageLabel.innerHTML = `<strong>Pagina:</strong> ${pageText}`;
+            pageLabel.style.marginBottom = "10px";
+            pageLabel.style.color = "#666";
+            div.appendChild(pageLabel);
+          }
+          
+          // Create delete button
+          const deleteButton = document.createElement("button");
+          deleteButton.className = "delete-card";
+          deleteButton.innerHTML = '<i class="fas fa-trash"></i> Elimina';
+          deleteButton.style.cssText = `
+            background-color: #ff6961;
+            color: white;
+            padding: 8px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            width: auto;
+            margin-top: 5px;
+          `;
+          
+          deleteButton.addEventListener("click", () => {
+            if (confirm("Vuoi eliminare questa flashcard?")) {
+              state.decks[state.currentDeck].splice(i, 1);
+              saveDecks();
+              toggleFlashcardList(); // Refresh the list
+              updateProgressBar();
+            }
+          });
+          
+          // Add all elements to the card div
+          div.appendChild(questionLabel);
+          div.appendChild(questionArea);
+          div.appendChild(answerLabel);
+          div.appendChild(answerArea);
+          div.appendChild(deleteButton);
+          
+          cardList.appendChild(div);
+        });
+        
+        // Add styles for card items
+        const style = document.createElement('style');
+        style.textContent = `
+          .card-item {
+            background: white;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+          }
+          .card-item textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+            margin-top: 5px;
+          }
+        `;
+        document.head.appendChild(style);
+        
+        cardList.style.display = "block";
+      } else {
+        // Close editing mode
+        state.uiState.editingFlashcardsActive = false;
+        saveUIState();
+        cardList.style.display = "none";
+      }
+    }
+
+    function exportDeck() {
+      const deck = state.decks[state.currentDeck];
+      if (!deck.length) {
+        alert("Il mazzo " + state.currentDeck + " è vuoto.");
+        return;
+      }
+
+      // Generate content
+      let content = "";
+      deck.forEach(card => {
+        content += card.question + "\n" + card.answer + "\n\n";
+      });
+
+      // Create file content
+      const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+      const url = window.URL.createObjectURL(blob);
+      
+      // Create hidden link and trigger download
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${state.currentDeck}.txt`;
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      
+      // Create a click event
+      const event = new MouseEvent('click');
+      link.dispatchEvent(event);
+      
+      // Cleanup
+      setTimeout(() => {
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      }, 100);
+    }
+
+    function toggleNewCardSection() {
+      const section = document.getElementById("newCardSection");
+      const icon = document.querySelector(".toggle-icon");
+      
+      state.uiState.newCardSectionVisible = !state.uiState.newCardSectionVisible;
+      
+      if (state.uiState.newCardSectionVisible) {
+        section.style.display = "block";
+        icon.classList.add("rotated");
+      } else {
+        section.style.display = "none";
+        icon.classList.remove("rotated");
+      }
+      
+      saveUIState();
+    }
+
+    // Add event listeners to capture clicks on other buttons
+    function setupButtonHandlers() {
+      // Use document-level click event instead of attaching to individual buttons
+      document.addEventListener('click', function(event) {
+        // Find the clicked element (button or any element)
+        let target = event.target;
+        
+        // Navigate up to find button if we clicked on a child (like an icon)
+        while (target && target.tagName !== 'BUTTON' && target !== document.body) {
+          target = target.parentElement;
+        }
+        
+        // Skip non-button clicks and delete-card buttons
+        if (!target || target.tagName !== 'BUTTON' || target.classList.contains('delete-card')) {
+          return;
+        }
+        
+        console.log('Button clicked:', target);
+        
+        // Special handling for "Inizia sessione di studio" button
+        if (target.getAttribute('onclick') === 'startStudy()') {
+          // If editing mode is active, close it first
+          if (state.uiState.editingFlashcardsActive) {
+            console.log('Closing flashcard editing menu before starting study session');
+            const cardList = document.getElementById("cardList");
+            cardList.style.display = "none";
+            state.uiState.editingFlashcardsActive = false;
+            saveUIState();
+          }
+          // Let the startStudy() function run normally
+          return;
+        }
+        
+        // If we're not clicking inside the card list or controls AND not clicking the toggle button
+        if (!target.closest('#cardList') && 
+            !target.closest('.controls') && 
+            target.getAttribute('onclick') !== 'toggleFlashcardList()') {
+          
+          // Check if study session is active
+          if (state.uiState.studySessionActive) {
+            // End the study session first
+            endStudy();
+            alert("Sessione di studio terminata");
+          }
+          
+          // Check if editing mode is active
+          if (state.uiState.editingFlashcardsActive) {
+            console.log('Closing flashcard editing menu');
+            // Close the editing mode
+            const cardList = document.getElementById("cardList");
+            cardList.style.display = "none";
+            state.uiState.editingFlashcardsActive = false;
+            saveUIState();
+          }
+        }
+        
+        // The original onclick will fire naturally
+      });
+    }
+
+    // Initialize
+    updateDeckSelector();
+
+    // Restore UI state
+    function restoreUIState() {
+      try {
+        const savedUIState = JSON.parse(localStorage.getItem("uiState"));
+        if (savedUIState) {
+          state.uiState = { ...state.uiState, ...savedUIState };
+          
+          // Apply saved UI states
+          if (state.uiState.newCardSectionVisible) {
+            document.getElementById("newCardSection").style.display = "block";
+            document.querySelector(".toggle-icon").classList.add("rotated");
+          }
+          
+          // Handle study session if it was active before page reload
+          if (state.uiState.studySessionActive) {
+            // Just reset it since we don't want to auto-resume
+            state.uiState.studySessionActive = false;
+            saveUIState();
+          }
+          
+          // Handle editing mode if it was active before page reload
+          if (state.uiState.editingFlashcardsActive) {
+            // Just reset it since we don't want to auto-resume
+            state.uiState.editingFlashcardsActive = false;
+            saveUIState();
+          }
+        }
+      } catch (e) {
+        console.error("Error restoring UI state:", e);
+      }
+    }
+
+    // Call restoreUIState after page loads
+    document.addEventListener('DOMContentLoaded', async () => {
+      try {
+        await openDB();
+        console.log("IndexedDB initialized");
+        restoreUIState();
+        setupButtonHandlers();
+      } catch (error) {
+        console.error("Failed to initialize IndexedDB:", error);
+        // Continue without IndexedDB
+        restoreUIState();
+        setupButtonHandlers();
+      }
+    });
+
+    // Helper function to extract lines from PDF text content preserving original line breaks
+    function extractLinesFromTextContent(textContent) {
+      const items = textContent.items;
+      const lines = [];
+      let currentLine = "";
+      let lastY = null;
+      
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        const y = Math.round(item.transform[5]);
+        
+        // If Y position has changed significantly, it's a new line
+        if (lastY !== null && Math.abs(y - lastY) > 3) {
+          if (currentLine) lines.push(currentLine);
+          currentLine = item.str;
+        } else {
+          // Same line, add space if needed
+          if (currentLine && item.str) currentLine += " ";
+          currentLine += item.str;
+        }
+        
+        lastY = y;
+      }
+      
+      // Add the last line
+      if (currentLine) lines.push(currentLine);
+      
+      return lines;
+    }
+    
+    // Updated version of processFlashcardsForSection that handles multiple pages and multi-line questions
+    function processFlashcardsForSectionWithPages(sectionLines, pageNumbers, pdfFilename) {
+      // Initialize variables for building multi-line questions
+      let currentQuestion = "";
+      let collectingQuestion = false;
+      let newCardsAdded = 0;
+      let duplicatesFound = 0;
+      
+      for (let i = 0; i < sectionLines.length; i++) {
+        const line = sectionLines[i].trim();
+        
+        // Skip empty lines
+        if (!line) continue;
+        
+        // Check if this line ends with a question mark
+        const isEndOfQuestion = line.match(/\?\s*$/);
+        
+        // If we're collecting a question or this line ends with a question mark
+        if (collectingQuestion || isEndOfQuestion) {
+          // Add to the current question (with a space if not the first line)
+          if (currentQuestion && line) {
+            currentQuestion += " " + line;
+          } else {
+            currentQuestion = line;
+          }
+          
+          // If this is the end of the question
+          if (isEndOfQuestion) {
+            collectingQuestion = false;
+            
+            // Make sure we have an answer (next non-empty line)
+            let answerIndex = i + 1;
+            while (answerIndex < sectionLines.length && !sectionLines[answerIndex].trim()) {
+              answerIndex++;
+            }
+            
+            // If we found an answer
+            if (answerIndex < sectionLines.length) {
+              const answer = sectionLines[answerIndex].trim();
+              
+              console.log("Found multi-line question:", currentQuestion);
+              console.log("Found answer:", answer);
+              
+              // Check if this flashcard already exists
+              const existingCardIndex = findExistingFlashcard(currentQuestion, answer);
+              
+              if (existingCardIndex !== -1) {
+                // Flashcard already exists, update the page reference if needed
+                duplicatesFound++;
+                
+                // Add new page references if they don't exist already
+                const existingCard = state.decks[state.currentDeck][existingCardIndex];
+                
+                // Add main page if not already in the references
+                if (existingCard.pageNumber !== pageNumbers[0] && 
+                    !existingCard.additionalPages.includes(pageNumbers[0])) {
+                  existingCard.additionalPages.push(pageNumbers[0]);
+                }
+                
+                // Add any additional pages not already in the references
+                if (pageNumbers.length > 1) {
+                  for (let p = 1; p < pageNumbers.length; p++) {
+                    if (existingCard.pageNumber !== pageNumbers[p] && 
+                        !existingCard.additionalPages.includes(pageNumbers[p])) {
+                      existingCard.additionalPages.push(pageNumbers[p]);
+                    }
+                  }
+                }
+                
+                console.log("Found duplicate flashcard, updated page references");
+              } else {
+                // Create a new flashcard
+                state.decks[state.currentDeck].push({
+                  question: currentQuestion,
+                  answer: answer,
+                  status: "new",
+                  pageNumber: pageNumbers[0], // First page as main reference
+                  additionalPages: pageNumbers.length > 1 ? pageNumbers.slice(1) : [],
+                  pdfFilename: pdfFilename
+                });
+                
+                newCardsAdded++;
+              }
+              
+              // Skip to the line after the answer
+              i = answerIndex;
+            }
+            
+            // Reset for next question
+            currentQuestion = "";
+          } else {
+            // Still collecting the question
+            collectingQuestion = true;
+          }
+        } else if (line.endsWith("?")) {
+          // Single line question
+          const question = line;
+          
+          // Look for the answer (next non-empty line)
+          let answerIndex = i + 1;
+          while (answerIndex < sectionLines.length && !sectionLines[answerIndex].trim()) {
+            answerIndex++;
+          }
+          
+          // If we found an answer
+          if (answerIndex < sectionLines.length) {
+            const answer = sectionLines[answerIndex].trim();
+            
+            console.log("Found single-line question:", question);
+            console.log("Found answer:", answer);
+            
+            // Check if this flashcard already exists
+            const existingCardIndex = findExistingFlashcard(question, answer);
+            
+            if (existingCardIndex !== -1) {
+              // Flashcard already exists, update the page reference if needed
+              duplicatesFound++;
+              
+              // Add new page references if they don't exist already
+              const existingCard = state.decks[state.currentDeck][existingCardIndex];
+              
+              // Add main page if not already in the references
+              if (existingCard.pageNumber !== pageNumbers[0] && 
+                  !existingCard.additionalPages.includes(pageNumbers[0])) {
+                existingCard.additionalPages.push(pageNumbers[0]);
+              }
+              
+              // Add any additional pages not already in the references
+              if (pageNumbers.length > 1) {
+                for (let p = 1; p < pageNumbers.length; p++) {
+                  if (existingCard.pageNumber !== pageNumbers[p] && 
+                      !existingCard.additionalPages.includes(pageNumbers[p])) {
+                    existingCard.additionalPages.push(pageNumbers[p]);
+                  }
+                }
+              }
+              
+              console.log("Found duplicate flashcard, updated page references");
+            } else {
+              // Create a new flashcard
+              state.decks[state.currentDeck].push({
+                question: question,
+                answer: answer,
+                status: "new",
+                pageNumber: pageNumbers[0], 
+                additionalPages: pageNumbers.length > 1 ? pageNumbers.slice(1) : [],
+                pdfFilename: pdfFilename
+              });
+              
+              newCardsAdded++;
+            }
+            
+            // Skip to the line after the answer
+            i = answerIndex;
+          }
+        } else {
+          // Start collecting a new potential question
+          currentQuestion = line;
+          collectingQuestion = true;
+        }
+      }
+      
+      return { newCardsAdded, duplicatesFound };
+    }
+    
+    // Helper function to find an existing flashcard with the same question and answer
+    function findExistingFlashcard(question, answer) {
+      const normalizedQuestion = question.trim().toLowerCase();
+      const normalizedAnswer = answer.trim().toLowerCase();
+      
+      for (let i = 0; i < state.decks[state.currentDeck].length; i++) {
+        const card = state.decks[state.currentDeck][i];
+        
+        // Compare normalized versions of question and answer (case insensitive)
+        if (card.question.trim().toLowerCase() === normalizedQuestion && 
+            card.answer.trim().toLowerCase() === normalizedAnswer) {
+          return i; // Return the index of the matching card
+        }
+      }
+      
+      return -1; // No match found
+    }
+  </script>
+</body>
+</html>
